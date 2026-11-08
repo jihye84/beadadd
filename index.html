@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script>
+/* 카카오톡·네이버·페이스북·인스타그램 등 인앱 브라우저에서 열리면 기본 브라우저로 다시 열기 */
+(function () {
+  var ua = navigator.userAgent || '';
+  var url = location.href;
+  var inApp = /KAKAOTALK|NAVER\(inapp|FBAN|FBAV|FB_IAB|Instagram|Line\/|DaumApps|everytimeApp|wv\)/i.test(ua);
+  if (/KAKAOTALK/i.test(ua)) { location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url); return; }
+  if (/Line\//i.test(ua) && url.indexOf('openExternalBrowser=1') < 0) {
+    location.href = url + (url.indexOf('?') < 0 ? '?' : '&') + 'openExternalBrowser=1'; return;
+  }
+  if (!inApp) return;
+  if (/Android/i.test(ua)) {
+    location.href = 'intent://' + url.replace(/^https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;end'; return;
+  }
+  document.addEventListener('DOMContentLoaded', function () {
+    var box = document.createElement('div');
+    box.setAttribute('role', 'dialog');
+    box.style.cssText = 'position:fixed;inset:0;z-index:99;background:rgba(13,17,32,.94);color:#eef0f8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;font:15px/1.6 system-ui,sans-serif';
+    box.innerHTML = '<strong style="font-size:18px">사파리에서 열어 주세요</strong>' +
+      '<span>이 앱 안의 브라우저에서는 일부 기능이 제대로 작동하지 않을 수 있어요.<br>⋯ 메뉴에서 <b>Safari로 열기</b>를 눌러 주세요.</span>' +
+      '<button id="copyUrl" style="font:inherit;padding:10px 18px;border-radius:999px;border:0;background:#eef0f8;color:#0d1120">주소 복사</button>' +
+      '<button id="stayHere" style="font:inherit;background:none;border:0;color:#9aa3c0;text-decoration:underline">그냥 여기서 보기</button>';
+    document.body.appendChild(box);
+    document.getElementById('copyUrl').onclick = function () {
+      var b = this;
+      (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(
+        function () { b.textContent = '복사했어요'; }, function () { prompt('주소를 복사하세요', url); });
+    };
+    document.getElementById('stayHere').onclick = function () { box.remove(); };
+  });
+})();
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>구슬로 보는 덧셈</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#fbf6ec; --ink:#3a3226; --soft:#8a7e6c; --line:#e6dccb;
+    --o:#ff8a3d; --o-dk:#d9601a; --b:#3f8cff; --b-dk:#1f62cf;
+    --ok:#2fa86a; --up:#ff6b6b; --down:#8a6cf0;
+    --d:40px; --f:52px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:'Jua',system-ui,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    user-select:none;-webkit-user-select:none;touch-action:manipulation}
+  #app{height:100%;display:grid;grid-template-rows:auto 1fr auto;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:clamp(6px,1.4vh,14px) clamp(12px,2.5vw,32px) 0;}
+  header h1{margin:0;font-weight:400;font-size:clamp(16px,2.6vh,26px);color:var(--soft)}
+  header h1 b{color:var(--ink);font-weight:400}
+  #hideBtn{font:inherit;font-size:clamp(14px,2.2vh,22px);border:2px solid var(--line);background:#fff;color:var(--soft);
+    border-radius:999px;padding:.3em .9em;min-height:44px;cursor:pointer}
+  #hideBtn[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  #stage{position:relative;min-height:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:calc(var(--d)*.25);padding:0 12px}
+  .row{position:relative}
+  .eq{display:flex;align-items:center;gap:calc(var(--f)*.18);font-size:var(--f);line-height:1;height:calc(var(--f)*1.35);white-space:nowrap}
+  .num{display:inline-flex;align-items:center;justify-content:center;min-width:1.15em;border-radius:.2em;padding:0 .08em;transition:background .3s}
+  .num.o{color:var(--o-dk)} .num.b{color:var(--b-dk)}
+  .num.changed{background:#fff2b8;box-shadow:0 0 0 3px #ffd54a inset}
+  .op{color:var(--soft)}
+  .sum{display:inline-flex;align-items:center;justify-content:center;min-width:1.6em;height:1.25em;border-radius:.25em;background:#fff;border:3px solid var(--line);padding:0 .15em;cursor:pointer}
+  .sum.hidden{color:var(--soft);background:#f3ecdf;border-style:dashed}
+  .sum.pop{animation:pop .5s ease}
+  @keyframes pop{0%{transform:scale(.6)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+  .step{display:inline-flex;flex-direction:column;gap:2px;margin-left:-.05em}
+  .step button{font:inherit;font-size:calc(var(--f)*.32);width:max(34px,calc(var(--f)*.62));height:max(26px,calc(var(--f)*.5));
+    border:0;border-radius:.5em;background:#efe6d6;color:var(--soft);cursor:pointer;line-height:1;padding:0}
+  .step button:active{background:#e2d5bf}
+  .step button:disabled{opacity:.3}
+
+  .track{position:relative;height:var(--th,calc(var(--d)*1.65));}
+  .bead{position:absolute;top:0;width:var(--d);height:var(--d);border-radius:50%;will-change:transform}
+  .bead.o{background:radial-gradient(circle at 34% 30%,#fff8 0 12%,#ffb27f 22%,var(--o) 52%,var(--o-dk) 100%);box-shadow:0 2px 3px #0002}
+  .bead.b{background:radial-gradient(circle at 34% 30%,#fff8 0 12%,#8fbaff 22%,var(--b) 52%,var(--b-dk) 100%);box-shadow:0 2px 3px #0002}
+  .bead.fresh{box-shadow:0 0 0 4px #fff,0 0 0 7px var(--up),0 0 18px var(--up)}
+  .bead.ghost{background:none;border:3px dashed var(--down);box-shadow:none}
+  .tick{position:absolute;width:var(--d);text-align:center;font-size:calc(var(--d)*.42);color:var(--soft)}
+  .rail{position:absolute;top:calc(var(--d)*.5 - 2px);height:4px;border-radius:2px;background:#d8ccb7}
+  .guide{position:absolute;top:calc(var(--d)*-.35);height:calc(var(--d)*1.7);border-left:3px dashed #b9ab93;opacity:0;transition:opacity .4s}
+  .guide.on{opacity:1}
+
+  #rel{height:calc(var(--f)*1.0);display:flex;align-items:center;justify-content:center;}
+  .badge{font-size:calc(var(--f)*.55);padding:.2em .8em;border-radius:999px;color:#fff;opacity:0;transform:scale(.7);transition:opacity .35s,transform .35s;white-space:nowrap}
+  .badge.on{opacity:1;transform:scale(1)}
+  .badge.same{background:var(--ok)} .badge.up{background:var(--up)} .badge.down{background:var(--down)}
+
+  footer{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(6px,1.2vw,14px);padding:clamp(8px,1.6vh,18px) clamp(10px,2.5vw,32px) max(clamp(10px,2vh,22px),env(safe-area-inset-bottom))}
+  footer button{font:inherit;font-size:clamp(16px,2.9vh,30px);min-height:max(52px,8.5vh);border:0;border-radius:18px;cursor:pointer;
+    color:#fff;box-shadow:0 4px 0 #0002;padding:.2em .4em;line-height:1.15}
+  footer button:active{transform:translateY(3px);box-shadow:0 1px 0 #0002}
+  footer button:disabled{opacity:.35}
+  #bSwap{background:var(--ok)} #bUp{background:var(--up)} #bDown{background:var(--down)} #bLift{background:#b5a68c}
+  @media (max-width:600px){
+    footer{grid-template-columns:repeat(2,1fr)}
+    footer button{min-height:52px;font-size:17px}
+  }
+  @media (prefers-reduced-motion:reduce){ .badge,.guide{transition:none} .sum.pop{animation:none} }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1><b>구슬로 보는 덧셈</b></h1>
+    <button id="hideBtn" aria-pressed="false">답 가리기</button>
+  </header>
+
+  <main id="stage">
+    <section class="row" id="rowA">
+      <div class="eq" id="eqA"></div>
+      <div class="track" id="trackA"></div>
+    </section>
+    <div id="rel"><span class="badge" id="badge"></span></div>
+    <section class="row" id="rowB">
+      <div class="eq" id="eqB"></div>
+      <div class="track" id="trackB"></div>
+    </section>
+  </main>
+
+  <footer>
+    <button id="bSwap">🔄 순서 바꾸기</button>
+    <button id="bUp">1 큰 수<br>더하기</button>
+    <button id="bDown">1 작은 수<br>더하기</button>
+    <button id="bLift">⬆ 위로 올리기</button>
+  </footer>
+</div>
+
+<script>
+(() => {
+  const MAX = 10, SLOTS = 20;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = id => document.getElementById(id);
+  const root = document.documentElement;
+
+  // 위 식: 앞의 수 a(주황), 뒤의 수 b(파랑)
+  let A = 9, B = 6;
+  let bottom = null;          // {first:{n,c}, second:{n,c}, mode, extra}
+  let hide = false;
+  let revealedA = false, revealedB = false;
+  let busy = false;
+  let d = 40, g = 5, cols = 20;
+
+  // ---------- 크기 ----------
+  function layout() {
+    const st = $('stage');
+    const W = st.clientWidth - 24, H = st.clientHeight;
+    // 세로로 긴 화면(휴대폰)은 10개씩 두 줄, 가로 화면은 20개 한 줄
+    cols = W / H < 1.1 ? 10 : 20;
+    const unitW = cols === 20 ? 20 + 19 * 0.12 + 0.35 * 2 + 0.9 : 10 + 9 * 0.12 + 0.35;
+    const dw = W / unitW;
+    const dh = H / (cols === 20 ? 8.4 : 11);
+    d = Math.max(12, Math.min(dw, dh, 76));
+    g = d * 0.12;
+    const f = Math.max(28, Math.min(d * 1.3, 96));
+    root.style.setProperty('--th', (cols === 20 ? d * 1.65 : d * 2.95) + 'px');
+    root.style.setProperty('--d', d + 'px');
+    root.style.setProperty('--f', f + 'px');
+    const tw = trackWidth();
+    for (const id of ['rowA', 'rowB', 'trackA', 'trackB']) $(id).style.width = tw + 'px';
+    renderAll(false);
+  }
+  function xAt(i) {
+    if (cols === 10) i = i % 10;
+    let x = i * (d + g);
+    if (i >= 5) x += d * 0.35;
+    if (i >= 10) x += d * 0.9;
+    if (i >= 15) x += d * 0.35;
+    return x;
+  }
+  function yAt(i) { return cols === 10 && i >= 10 ? d * 1.3 : 0; }
+  function trackWidth() { return xAt(cols - 1) + d; }
+
+  // ---------- 구슬 목록 ----------
+  // 같은 구슬은 같은 id → 순서를 바꿀 때 구슬이 실제로 자리를 옮김
+  function beadsFor(parts) {
+    const list = [];
+    for (const p of parts) for (let k = 0; k < p.n; k++) list.push({ id: p.c + k, c: p.c });
+    return list;
+  }
+
+  function drawTrack(track, list, opts = {}) {
+    track.innerHTML = '';
+    const count = list.filter(b => !b.ghost).length;
+    for (let r = 0; r < SLOTS / cols; r++) {
+      const rail = document.createElement('div');
+      rail.className = 'rail';
+      rail.style.left = (-d * 0.3) + 'px';
+      rail.style.top = (yAt(r * 10) + d * 0.5 - 2) + 'px';
+      rail.style.width = (trackWidth() + d * 0.6) + 'px';
+      track.appendChild(rail);
+    }
+    if (opts.guideAt != null) {
+      const gd = document.createElement('div');
+      const k = opts.guideAt - 1;
+      gd.className = 'guide' + (opts.guideOn ? ' on' : '');
+      gd.style.left = (xAt(k) + d + g / 2) + 'px';
+      gd.style.top = (yAt(k) - d * 0.35) + 'px';
+      gd.style.height = (cols === 10 ? d * 1.6 : d * 1.7) + 'px';
+      track.appendChild(gd);
+    }
+    const els = {};
+    list.forEach((b, i) => {
+      const el = document.createElement('div');
+      el.className = 'bead ' + (b.ghost ? 'ghost' : b.c) + (b.fresh ? ' fresh' : '');
+      el.style.left = xAt(i) + 'px';
+      el.style.top = yAt(i) + 'px';
+      track.appendChild(el);
+      els[b.id] = el;
+    });
+    for (let i = 4; i < count; i += 5) {
+      const t = document.createElement('div');
+      t.className = 'tick';
+      t.style.left = xAt(i) + 'px';
+      t.style.top = (yAt(i) + d * 1.02) + 'px';
+      t.textContent = i + 1;
+      track.appendChild(t);
+    }
+    return els;
+  }
+
+  // ---------- 식 ----------
+  function numSpan(n, c, changed) {
+    return `<span class="num ${c}${changed ? ' changed' : ''}">${n}</span>`;
+  }
+  function sumSpan(row, total, pop) {
+    const shown = !hide || (row === 'A' ? revealedA : revealedB);
+    return `<span class="sum${shown ? '' : ' hidden'}${pop ? ' pop' : ''}" data-row="${row}">${shown ? total : '?'}</span>`;
+  }
+  function stepper(which) {
+    const v = which === 'a' ? A : B;
+    return `<span class="step"><button data-s="${which}+" ${v >= MAX ? 'disabled' : ''} aria-label="1 크게">▲</button>` +
+           `<button data-s="${which}-" ${v <= 1 ? 'disabled' : ''} aria-label="1 작게">▼</button></span>`;
+  }
+  function renderA() {
+    $('eqA').innerHTML = numSpan(A, 'o') + stepper('a') + '<span class="op">+</span>' +
+      numSpan(B, 'b') + stepper('b') + '<span class="op">=</span>' + sumSpan('A', A + B);
+    drawTrack($('trackA'), beadsFor([{ n: A, c: 'o' }, { n: B, c: 'b' }]));
+  }
+  function bottomList() {
+    const list = beadsFor([bottom.first, bottom.second]);
+    if (bottom.mode === 'up') list[list.length - 1].fresh = true;
+    if (bottom.mode === 'down') list.push({ id: 'ghost', ghost: true });
+    return list;
+  }
+  function renderB(pop, badgeOn = true) {
+    if (!bottom) { $('eqB').innerHTML = ''; $('trackB').innerHTML = ''; setBadge(null); return; }
+    const { first, second, mode } = bottom;
+    const total = first.n + second.n;
+    const ch2 = mode === 'up' || mode === 'down';
+    $('eqB').innerHTML = numSpan(first.n, first.c) + '<span class="op">+</span>' +
+      numSpan(second.n, second.c, ch2) + '<span class="op">=</span>' + sumSpan('B', total, pop);
+    drawTrack($('trackB'), bottomList(), { guideAt: A + B, guideOn: true });
+    setBadge(badgeOn && (!hide || revealedB) ? mode : null);
+  }
+  function setBadge(mode) {
+    const bd = $('badge');
+    if (!mode) { bd.className = 'badge'; return; }
+    const txt = { swap: '= 합이 같아요', up: '합이 1 커요', down: '합이 1 작아요' }[mode];
+    const cls = { swap: 'same', up: 'up', down: 'down' }[mode];
+    bd.textContent = txt;
+    bd.className = 'badge ' + cls + ' on';
+  }
+  function renderAll() { renderA(); renderB(false); updateButtons(); }
+
+  function updateButtons() {
+    $('bUp').disabled = B >= MAX;
+    $('bDown').disabled = B <= 1;
+    $('bLift').disabled = !bottom || bottom.first.n + bottom.second.n === 0 ||
+      bottom.first.n > MAX || bottom.second.n > MAX || bottom.second.n < 1;
+  }
+
+  // ---------- 동작 ----------
+  function startCopy() {
+    // 아래 줄을 위 줄과 똑같이 그려 놓고 출발
+    $('eqB').innerHTML = numSpan(A, 'o') + '<span class="op">+</span>' + numSpan(B, 'b') +
+      '<span class="op">=</span><span class="sum hidden">?</span>';
+    setBadge(null);
+    return drawTrack($('trackB'), beadsFor([{ n: A, c: 'o' }, { n: B, c: 'b' }]), { guideAt: A + B, guideOn: false });
+  }
+
+  function animate(el, frames, opts) {
+    if (reduce || !el.animate) return Promise.resolve();
+    return el.animate(frames, opts).finished.catch(() => {});
+  }
+  const wait = ms => new Promise(r => setTimeout(r, reduce ? 0 : ms));
+
+  async function doSwap() {
+    if (busy) return; busy = true; revealedB = false;
+    const els = startCopy();
+    await wait(350);
+    // 파랑 무리는 위로, 주황 무리는 아래로 비켜 가며 자리를 바꿈
+    const jobs = [];
+    const orderAfter = beadsFor([{ n: B, c: 'b' }, { n: A, c: 'o' }]);
+    orderAfter.forEach((b, i) => {
+      const el = els[b.id];
+      const fx = parseFloat(el.style.left), fy = parseFloat(el.style.top);
+      const tx = xAt(i), ty = yAt(i);
+      el.style.left = tx + 'px'; el.style.top = ty + 'px';
+      const dx = fx - tx, dy = fy - ty, lift = (b.c === 'b' ? -1 : 1) * d * (cols === 10 ? 0.55 : 0.95);
+      jobs.push(animate(el, [
+        { transform: `translate(${dx}px,${dy}px)` },
+        { transform: `translate(${dx}px,${dy + lift}px)`, offset: .2 },
+        { transform: `translate(0px,${lift}px)`, offset: .8 },
+        { transform: 'translate(0,0)' }
+      ], { duration: 1500, easing: 'ease-in-out', delay: (b.c === 'b' ? i : i - B) * 25 }));
+    });
+    await Promise.all(jobs);
+    bottom = { first: { n: B, c: 'b' }, second: { n: A, c: 'o' }, mode: 'swap' };
+    renderB(true); updateButtons(); busy = false;
+  }
+
+  async function doUp() {
+    if (busy || B >= MAX) return; busy = true; revealedB = false;
+    startCopy();
+    await wait(450);
+    bottom = { first: { n: A, c: 'o' }, second: { n: B + 1, c: 'b' }, mode: 'up' };
+    renderB(true, false);
+    const els = $('trackB').querySelectorAll('.bead');
+    await animate(els[els.length - 1], [
+      { transform: 'translateY(-160%) scale(.3)', opacity: 0 },
+      { transform: 'translateY(10%) scale(1.15)', opacity: 1, offset: .7 },
+      { transform: 'none' }
+    ], { duration: 700, easing: 'ease-out' });
+    renderB(false); updateButtons(); busy = false;
+  }
+
+  async function doDown() {
+    if (busy || B <= 1) return; busy = true; revealedB = false;
+    const els = startCopy();
+    await wait(450);
+    const last = els['b' + (B - 1)];
+    await animate(last, [
+      { transform: 'none', opacity: 1 },
+      { transform: 'translateY(-160%) scale(.4)', opacity: 0 }
+    ], { duration: 650, easing: 'ease-in', fill: 'forwards' });
+    bottom = { first: { n: A, c: 'o' }, second: { n: B - 1, c: 'b' }, mode: 'down' };
+    renderB(true); updateButtons(); busy = false;
+  }
+
+  function doLift() {
+    if (busy || !bottom) return;
+    // 아래 식을 새 기준 식으로 (색은 앞 수 주황, 뒤 수 파랑으로 다시 맞춤)
+    A = bottom.first.n; B = bottom.second.n;
+    bottom = null; revealedA = false; revealedB = false;
+    renderAll();
+    const s = $('eqA').querySelector('.sum'); s && s.classList.add('pop');
+  }
+
+  // ---------- 이벤트 ----------
+  $('bSwap').onclick = doSwap;
+  $('bUp').onclick = doUp;
+  $('bDown').onclick = doDown;
+  $('bLift').onclick = doLift;
+  $('hideBtn').onclick = () => {
+    hide = !hide; revealedA = revealedB = false;
+    $('hideBtn').setAttribute('aria-pressed', hide);
+    $('hideBtn').textContent = hide ? '답 보이기' : '답 가리기';
+    if (!busy) { renderA(); renderB(false); }
+  };
+  $('stage').addEventListener('click', e => {
+    const s = e.target.closest('.sum');
+    if (s && hide && !busy) {
+      if (s.dataset.row === 'A') { revealedA = true; renderA(); }
+      if (s.dataset.row === 'B') { revealedB = true; renderB(true); }
+      return;
+    }
+    const st = e.target.closest('[data-s]');
+    if (st && !busy) {
+      const k = st.dataset.s;
+      if (k === 'a+' && A < MAX) A++;
+      if (k === 'a-' && A > 1) A--;
+      if (k === 'b+' && B < MAX) B++;
+      if (k === 'b-' && B > 1) B--;
+      bottom = null; revealedA = false;
+      renderAll();
+    }
+  });
+
+  let rt;
+  addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (!busy) layout(); }, 120); });
+
+  // 처음 열면 9+6 → 6+9 바꾸기를 바로 보여 줌
+  layout();
+  (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => { layout(); setTimeout(doSwap, reduce ? 0 : 700); });
+})();
+</script>
+</body>
+</html>
