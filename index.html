@@ -74,6 +74,7 @@
     border:0;border-radius:.5em;background:#efe6d6;color:var(--soft);cursor:pointer;line-height:1;padding:0}
   .step button:active{background:#e2d5bf}
   .step button:disabled{opacity:.3}
+  .step.ph{visibility:hidden}
 
   .track{position:relative;height:var(--th,calc(var(--d)*1.65));}
   .bead{position:absolute;top:0;width:var(--d);height:var(--d);border-radius:50%;will-change:transform}
@@ -237,6 +238,8 @@
     return `<span class="step"><button data-s="${which}+" ${v >= MAX ? 'disabled' : ''} aria-label="1 크게">▲</button>` +
            `<button data-s="${which}-" ${v <= 1 ? 'disabled' : ''} aria-label="1 작게">▼</button></span>`;
   }
+  // 아래 식에도 화살표 자리만큼 빈칸을 넣어 위 식과 간격을 맞춤
+  const PH = '<span class="step ph" aria-hidden="true"><button tabindex="-1">▲</button><button tabindex="-1">▼</button></span>';
   function renderA() {
     $('eqA').innerHTML = numSpan(A, 'o') + stepper('a') + '<span class="op">+</span>' +
       numSpan(B, 'b') + stepper('b') + '<span class="op">=</span>' + sumSpan('A', A + B);
@@ -253,8 +256,8 @@
     const { first, second, mode } = bottom;
     const total = first.n + second.n;
     const ch2 = mode === 'up' || mode === 'down';
-    $('eqB').innerHTML = numSpan(first.n, first.c) + '<span class="op">+</span>' +
-      numSpan(second.n, second.c, ch2) + '<span class="op">=</span>' + sumSpan('B', total, pop);
+    $('eqB').innerHTML = numSpan(first.n, first.c) + PH + '<span class="op">+</span>' +
+      numSpan(second.n, second.c, ch2) + PH + '<span class="op">=</span>' + sumSpan('B', total, pop);
     drawTrack($('trackB'), bottomList(), { guideAt: A + B, guideOn: true });
     setBadge(badgeOn && (!hide || revealedB) ? mode : null);
   }
@@ -278,7 +281,7 @@
   // ---------- 동작 ----------
   function startCopy() {
     // 아래 줄을 위 줄과 똑같이 그려 놓고 출발
-    $('eqB').innerHTML = numSpan(A, 'o') + '<span class="op">+</span>' + numSpan(B, 'b') +
+    $('eqB').innerHTML = numSpan(A, 'o') + PH + '<span class="op">+</span>' + numSpan(B, 'b') + PH +
       '<span class="op">=</span><span class="sum hidden">?</span>';
     setBadge(null);
     return drawTrack($('trackB'), beadsFor([{ n: A, c: 'o' }, { n: B, c: 'b' }]), { guideAt: A + B, guideOn: false });
